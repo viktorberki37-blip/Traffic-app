@@ -1,0 +1,652 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#101827">
+<meta name="description" content="Route Planner mit Wetter, Verkehr und Mautinformationen">
+<title>Route Planner 🛣️</title>
+
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0b1220;
+  --panel: #151f31;
+  --panel2: #1b2940;
+  --blue: #3698ff;
+  --green: #35d49a;
+  --red: #ff565f;
+  --yellow: #ffd166;
+  --text: #f4f7ff;
+  --muted: #aab7cc;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 18px;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: linear-gradient(145deg,#101c32,#080d17 70%);
+  color: var(--text);
+}
+main { max-width: 780px; margin: auto; }
+header { text-align: center; padding: 12px 0 22px; }
+header h1 { font-size: 30px; margin: 0; }
+header p { color: var(--muted); margin: 8px 0 0; }
+.card {
+  background: var(--panel);
+  border: 1px solid #2a3951;
+  border-radius: 20px;
+  padding: 17px;
+  margin-bottom: 15px;
+  box-shadow: 0 8px 28px #0002;
+}
+h2 { font-size: 18px; margin: 0 0 14px; }
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 12px 0 6px;
+}
+input, button {
+  font: inherit;
+  border-radius: 12px;
+}
+input {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  color: white;
+  background: #0d1728;
+  border: 1px solid #354660;
+  outline: none;
+}
+input:focus { border-color: var(--blue); }
+button {
+  cursor: pointer;
+  border: 0;
+  padding: 12px 15px;
+  font-weight: 700;
+  color: white;
+  background: var(--blue);
+}
+button:disabled { opacity: .5; cursor: wait; }
+button.secondary { background: #2b3b55; }
+button.green { background: #13875e; }
+button.full { width: 100%; margin-top: 13px; }
+button:active { transform: scale(.99); }
+.row { display: flex; gap: 10px; align-items: center; }
+.row > * { min-width: 0; flex: 1; }
+.swap {
+  display: block;
+  width: 48px;
+  margin: 12px auto 0;
+  background: #2b3b55;
+  font-size: 20px;
+}
+.status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #0d1728;
+  margin-top: 10px;
+}
+.status .emoji { font-size: 27px; }
+.status strong { display: block; }
+.small { color: var(--muted); font-size: 12px; }
+.green-text { color: var(--green); }
+.red-text { color: var(--red); }
+.yellow-text { color: var(--yellow); }
+.blue-text { color: #78baff; }
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+}
+.metric {
+  background: var(--panel2);
+  border-radius: 14px;
+  padding: 14px;
+}
+.metric span { display: block; color: var(--muted); font-size: 12px; }
+.metric strong { display: block; font-size: 19px; margin-top: 5px; }
+.weather-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+}
+.hour {
+  background: var(--panel2);
+  padding: 11px 4px;
+  border-radius: 13px;
+  text-align: center;
+}
+.hour .icon { font-size: 24px; display: block; }
+.hour b { display: block; font-size: 14px; }
+.hour small { color: var(--muted); font-size: 11px; }
+.incident {
+  padding: 12px;
+  margin-top: 9px;
+  border-radius: 12px;
+  background: #0d1728;
+  border-left: 4px solid var(--yellow);
+}
+.incident.danger { border-left-color: var(--red); }
+.incident p { margin: 5px 0; }
+details summary { cursor: pointer; color: #8fc6ff; }
+a { color: #8fc6ff; }
+footer { text-align: center; color: var(--muted); font-size: 12px; padding: 12px; }
+.hidden { display: none !important; }
+#message { white-space: pre-wrap; margin-top: 10px; font-size: 13px; }
+@media(min-width:600px) {
+  .weather-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .metrics { grid-template-columns: repeat(4,minmax(0,1fr)); }
+}
+</style>
+</head>
+
+<body>
+<main>
+<header>
+  <h1>🛣️ Route Planner</h1>
+  <p>🚗 Route · 🚦 Verkehr · ☁️ Wetter · 🇨🇿 Vignette</p>
+</header>
+
+<section class="card">
+  <h2>📍 Deine Route</h2>
+
+  <label for="start">Startort</label>
+  <input id="start" value="Neuburg an der Donau, Deutschland"
+         placeholder="Wo startest du?">
+
+  <button class="swap" id="swap" type="button"
+          aria-label="Start und Ziel tauschen">⇅</button>
+
+  <label for="destination">Zielort</label>
+  <input id="destination"
+         value="Asia Dragon Bazar, Svatý Kříž, Cheb, Tschechien"
+         placeholder="Wohin möchtest du?">
+
+  <div class="row">
+    <div>
+      <label for="departure">Abfahrtszeit</label>
+      <input id="departure" type="datetime-local">
+    </div>
+    <div>
+      <label for="averageSpeed">Fallback-Geschwindigkeit</label>
+      <input id="averageSpeed" type="number" min="10" max="160" value="80">
+    </div>
+  </div>
+
+  <button class="full" id="calculate">🔎 Route berechnen</button>
+  <div id="message" role="status"></div>
+</section>
+
+<section class="card">
+  <h2>📊 Reiseinformationen</h2>
+  <div class="metrics">
+    <div class="metric">
+      <span>🕒 Fahrzeit</span>
+      <strong id="duration">—</strong>
+    </div>
+    <div class="metric">
+      <span>📏 Entfernung</span>
+      <strong id="distance">—</strong>
+    </div>
+    <div class="metric">
+      <span>🏁 Ankunft</span>
+      <strong id="arrival">—</strong>
+    </div>
+    <div class="metric">
+      <span>⏱️ Verkehrsverzögerung</span>
+      <strong id="delay">—</strong>
+    </div>
+  </div>
+
+  <div class="status">
+    <span class="emoji" id="trafficEmoji">🚦</span>
+    <div>
+      <strong id="trafficTitle">Noch keine Route berechnet</strong>
+      <div class="small" id="trafficDescription">
+        Berechne eine Route, um Verkehrsdaten abzurufen.
+      </div>
+    </div>
+  </div>
+
+  <div class="status">
+    <span class="emoji">🇨🇿</span>
+    <div>
+      <strong id="vignetteTitle">Vignettenprüfung ausstehend</strong>
+      <div class="small" id="vignetteDescription">
+        Wird anhand verfügbarer Routendaten geprüft.
+      </div>
+    </div>
+  </div>
+
+  <button id="openMaps" class="secondary full" type="button">
+    🗺️ Route in Google Maps öffnen
+  </button>
+</section>
+
+<section class="card">
+  <h2>☁️ Stundenwetter am Ziel</h2>
+  <p class="small" id="weatherLocation">
+    Wetter wird nach der Routenberechnung geladen.
+  </p>
+  <div id="weather" class="weather-grid"></div>
+  <p class="small">
+    Wetterprognose von Open-Meteo. Die Werte gelten für den Zielort,
+    nicht für jeden Punkt entlang der Strecke.
+  </p>
+</section>
+
+<section class="card">
+  <h2>🚨 Verkehrsmeldungen entlang der Route</h2>
+  <p class="small">
+    Gemeldete Vorfälle im abgefragten Streckenumfeld. Je nach API-Abdeckung
+    können Meldungen fehlen oder auch Straßen neben der Route betreffen.
+  </p>
+  <div id="incidents">
+    <p class="small">Noch keine Verkehrsmeldungen geladen.</p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔑 API-Einstellungen</h2>
+  <p class="small">
+    Für Live-Routen und Verkehr benötigst du einen TomTom API-Schlüssel.
+    Er wird in diesem Browser gespeichert.
+  </p>
+  <label for="apiKey">TomTom API-Key</label>
+  <input id="apiKey" type="password" autocomplete="off"
+         placeholder="TomTom API-Schlüssel eingeben">
+  <div class="row">
+    <button id="saveKey" type="button" class="green">💾 Speichern</button>
+    <button id="showKey" type="button" class="secondary">👁️ Anzeigen</button>
+  </div>
+  <p class="small">
+    Hinweis: Ein Schlüssel in einer GitHub-Webseite ist für Besucher
+    technisch sichtbar. Beschränke ihn im TomTom-Dashboard auf deine
+    Website-Domain und aktiviere nur die benötigten APIs.
+  </p>
+</section>
+
+<footer>
+  Route Planner ❤️ · Daten von TomTom, OpenStreetMap und Open-Meteo
+</footer>
+</main>
+
+<script>
+"use strict";
+
+/*
+  ALL-IN-ONE ROUTE PLANNER
+
+  TomTom API key:
+  Create one at https://developer.tomtom.com/
+
+  Services:
+  - TomTom Routing API: route, ETA, traffic delay, toll/vignette sections
+  - TomTom Traffic Incidents API: reported incidents
+  - OpenStreetMap Nominatim: address search
+  - Open-Meteo: hourly destination weather
+
+  Important:
+  - Traffic reports depend on provider coverage.
+  - A missing vignette section is NOT proof that no vignette is needed.
+  - The incident query searches a corridor bounding box and can include
+    nearby roads that are not part of the chosen route.
+*/
+
+const $ = id => document.getElementById(id);
+
+let currentRoute = null;
+let routeCoordinates = [];
+let destinationCoordinates = null;
+
+function setMessage(text, isError = false) {
+  $("message").textContent = text;
+  $("message").style.color = isError ? "#ff777f" : "#aab7cc";
+}
+
+function getKey() {
+  return $("apiKey").value.trim() ||
+         localStorage.getItem("routePlannerTomTomKey") || "";
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds)) return "—";
+  const minutes = Math.round(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours ? `${hours} h ${rest} min` : `${rest} min`;
+}
+
+function formatDistance(metres) {
+  if (!Number.isFinite(metres)) return "—";
+  return metres >= 1000
+    ? `${(metres / 1000).toFixed(1).replace(".", ",")} km`
+    : `${Math.round(metres)} m`;
+}
+
+function formatDateTime(date) {
+  return new Intl.DateTimeFormat("de-DE", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(date);
+}
+
+function localDateTimeInput(date) {
+  const pad = n => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function weatherEmoji(code, isDay) {
+  if (code === 0) return isDay ? "☀️" : "🌙";
+  if (code === 1) return isDay ? "🌤️" : "🌙";
+  if (code === 2) return "⛅";
+  if (code === 3) return "☁️";
+  if ([45,48].includes(code)) return "🌫️";
+  if ([51,53,55,56,57].includes(code)) return "🌦️";
+  if ([61,63,65,66,67,80,81,82].includes(code)) return "🌧️";
+  if ([71,73,75,77,85,86].includes(code)) return "🌨️";
+  if ([95,96,99].includes(code)) return "🌩️";
+  return "🌡️";
+}
+
+function weatherDescription(code) {
+  const descriptions = {
+    0:"Klar", 1:"Überwiegend klar", 2:"Teilweise bewölkt",
+    3:"Bedeckt", 45:"Neblig", 48:"Nebel mit Reif",
+    51:"Leichter Nieselregen", 53:"Nieselregen", 55:"Starker Nieselregen",
+    56:"Gefrierender Nieselregen", 57:"Starker gefrierender Nieselregen",
+    61:"Leichter Regen", 63:"Regen", 65:"Starker Regen",
+    66:"Gefrierender Regen", 67:"Starker gefrierender Regen",
+    71:"Leichter Schnee", 73:"Schneefall", 75:"Starker Schneefall",
+    77:"Schneegriesel", 80:"Regenschauer", 81:"Regenschauer",
+    82:"Starke Regenschauer", 85:"Schneeschauer", 86:"Starke Schneeschauer",
+    95:"Gewitter", 96:"Gewitter mit Hagel", 99:"Starkes Gewitter mit Hagel"
+  };
+  return descriptions[code] || "Wetterdaten";
+}
+
+async function geocode(place) {
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.search = new URLSearchParams({
+    q: place,
+    format: "jsonv2",
+    limit: "1"
+  });
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Ortssuche fehlgeschlagen.");
+  const results = await response.json();
+  if (!results.length) {
+    throw new Error(`Ort nicht gefunden: ${place}`);
+  }
+  return {
+    lat: Number(results[0].lat),
+    lon: Number(results[0].lon),
+    name: results[0].display_name
+  };
+}
+
+async function tomtomRoute(start, end, key, departure) {
+  const coordinates = `${start.lat},${start.lon}:${end.lat},${end.lon}`;
+  const url = new URL(
+    `https://api.tomtom.com/routing/1/calculateRoute/${coordinates}/json`
+  );
+
+  const params = {
+    key,
+    traffic: "true",
+    routeType: "fastest",
+    travelMode: "car",
+    sectionType: "traffic,tollVignette,country",
+    computeTravelTimeFor: "all"
+  };
+
+  if (departure && departure.getTime() > Date.now() + 60000) {
+    params.departAt = departure.toISOString();
+  } else {
+    params.departAt = "now";
+  }
+
+  url.search = new URLSearchParams(params);
+
+  const response = await fetch(url);
+  const body = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(body?.error?.description ||
+      body?.detailedError?.message ||
+      `TomTom Routing API Fehler (${response.status}).`);
+  }
+
+  if (!body.routes || !body.routes.length) {
+    throw new Error("TomTom hat keine Route zurückgegeben.");
+  }
+  return body.routes[0];
+}
+
+function extractRoutePoints(route) {
+  const points = [];
+  for (const leg of (route.legs || [])) {
+    for (const point of (leg.points || [])) {
+      if (Number.isFinite(point.latitude) &&
+          Number.isFinite(point.longitude)) {
+        points.push([point.latitude, point.longitude]);
+      }
+    }
+  }
+  return points;
+}
+
+function renderRoute(route) {
+  const summary = route.summary || {};
+  const baseSeconds = summary.travelTimeInSeconds;
+  const trafficSeconds = summary.trafficTravelTimeInSeconds;
+  const noTrafficSeconds = summary.noTrafficTravelTimeInSeconds;
+
+  const travelSeconds = Number.isFinite(trafficSeconds)
+    ? trafficSeconds
+    : baseSeconds;
+
+  $("duration").textContent = formatDuration(travelSeconds);
+  $("distance").textContent = formatDistance(summary.lengthInMeters);
+
+  const departureValue = $("departure").value;
+  const departure = departureValue ? new Date(departureValue) : new Date();
+  $("arrival").textContent = formatDateTime(
+    new Date(departure.getTime() + travelSeconds * 1000)
+  );
+
+  let delaySeconds = Number.isFinite(summary.trafficDelayInSeconds)
+    ? summary.trafficDelayInSeconds
+    : (Number.isFinite(trafficSeconds) && Number.isFinite(noTrafficSeconds)
+       ? trafficSeconds - noTrafficSeconds : null);
+
+  $("delay").textContent = delaySeconds === null
+    ? "Unbekannt"
+    : formatDuration(Math.max(0, delaySeconds));
+
+  const delay = delaySeconds === null ? null : Math.max(0, delaySeconds);
+  if (delay === null) {
+    $("trafficEmoji").textContent = "❔";
+    $("trafficTitle").textContent = "Verkehrslage nicht eindeutig";
+    $("trafficDescription").textContent =
+      "Der Routenservice lieferte keine auswertbare Verzögerung.";
+  } else if (delay >= 1800) {
+    $("trafficEmoji").textContent = "🔴";
+    $("trafficTitle").textContent = "Starke Verzögerung";
+    $("trafficDescription").textContent =
+      "Laut Routenservice ist mit erheblicher Verzögerung zu rechnen.";
+  } else if (delay >= 600) {
+    $("trafficEmoji").textContent = "🟠";
+    $("trafficTitle").textContent = "Verkehrsverzögerung";
+    $("trafficDescription").textContent =
+      "Die Route weist eine merkliche Verzögerung auf.";
+  } else if (delay >= 180) {
+    $("trafficEmoji").textContent = "🟡";
+    $("trafficTitle").textContent = "Leichte Verzögerung";
+    $("trafficDescription").textContent =
+      "Es gibt eine kleine Verzögerung laut Routenservice.";
+  } else {
+    $("trafficEmoji").textContent = "🟢";
+    $("trafficTitle").textContent = "Keine größere Verzögerung";
+    $("trafficDescription").textContent =
+      "Laut Routenservice derzeit keine größere Verzögerung. Das garantiert keine komplett freie Straße.";
+  }
+
+  renderVignette(route);
+}
+
+function renderVignette(route) {
+  const sections = route.sections || [];
+  const tollSections = sections.filter(s =>
+    String(s.sectionType || "").toLowerCase().includes("tollvignette")
+  );
+
+  if (tollSections.length) {
+    $("vignetteTitle").textContent = "⚠️ Vignette / Maut prüfen";
+    $("vignetteDescription").textContent =
+      "Die Route enthält eine vom Dienst gemeldete Vignetten- oder Mautsektion. Prüfe das betroffene Land und die aktuelle offizielle Regelung.";
+  } else {
+    $("vignetteTitle").textContent = "Nicht sicher bestätigt";
+    $("vignetteDescription").textContent =
+      "Der Routendienst hat keine Vignettenssektion zurückgegeben. Das ist kein sicherer Nachweis, dass keine Vignette benötigt wird. Bitte die offiziellen Regeln für Deutschland und Tschechien prüfen.";
+  }
+}
+
+function getIncidentIcon(incident) {
+  const category = incident?.properties?.iconCategory;
+  const events = incident?.properties?.events || [];
+  const text = events.map(e => e.description || "").join(" ").toLowerCase();
+
+  if (text.includes("accident") || text.includes("unfall")) return "🚗💥";
+  if (text.includes("road closed") || text.includes("closure") ||
+      text.includes("sperr")) return "⛔";
+  if (text.includes("roadwork") || text.includes("construction") ||
+      text.includes("baustell")) return "🚧";
+  if (category === 8) return "⛔";
+  if (category === 1) return "🚗💥";
+  if (category === 6 || category === 7) return "🚧";
+  return "🚦";
+}
+
+function getIncidentText(incident) {
+  const p = incident?.properties || {};
+  const events = p.events || [];
+  const eventNames = events.map(e => e.description).filter(Boolean);
+  return eventNames.join(", ") || "Verkehrsstörung gemeldet";
+}
+
+function incidentLocation(incident) {
+  const p = incident?.properties || {};
+  return p.from || p.to || p.roadNumbers?.join(", ") ||
+         p.iconCategoryDescription || "";
+}
+
+function renderIncidents(items) {
+  const container = $("incidents");
+  container.replaceChildren();
+
+  if (!items.length) {
+    const p = document.createElement("p");
+    p.className = "small";
+    p.textContent =
+      "Keine Meldungen in der abgefragten Region gefunden. Das bedeutet nicht garantiert, dass die Route störungsfrei ist.";
+    container.appendChild(p);
+    return;
+  }
+
+  for (const item of items) {
+    const p = item.properties || {};
+    const title = getIncidentText(item);
+    const location = incidentLocation(item);
+    const icon = getIncidentIcon(item);
+    const delay = Number(p.magnitudeOfDelay);
+    const serious = delay >= 3 || icon === "⛔" || icon === "🚗💥";
+
+    const box = document.createElement("div");
+    box.className = "incident" + (serious ? " danger" : "");
+
+    const heading = document.createElement("strong");
+    heading.textContent = `${icon} ${title}`;
+    box.appendChild(heading);
+
+    if (location) {
+      const loc = document.createElement("p");
+      loc.textContent = location;
+      box.appendChild(loc);
+    }
+
+    if (p.startTime || p.endTime) {
+      const time = document.createElement("p");
+      time.className = "small";
+      const start = p.startTime ? new Date(p.startTime).toLocaleString("de-DE") : "";
+      const end = p.endTime ? new Date(p.endTime).toLocaleString("de-DE") : "";
+      time.textContent = [start && `Beginn: ${start}`, end && `Ende: ${end}`]
+        .filter(Boolean).join(" · ");
+      box.appendChild(time);
+    }
+
+    container.appendChild(box);
+  }
+}
+
+async function loadIncidents(points, key) {
+  if (!points || points.length < 2) {
+    renderIncidents([]);
+    return;
+  }
+
+  /*
+    TomTom incident endpoint accepts a bounding box.
+    A route may span a large area; large bounding boxes can be rejected.
+    To avoid an unbounded request, query overlapping smaller boxes along
+    the route. These boxes can include roads beside the route.
+  */
+  const stride = Math.max(1, Math.floor(points.length / 8));
+  const samples = points.filter((_, i) => i % stride === 0);
+  if (samples[samples.length - 1] !== points[points.length - 1]) {
+    samples.push(points[points.length - 1]);
+  }
+
+  const unique = new Map();
+
+  for (const [lat, lon] of samples) {
+    const padLat = 0.12;
+    const padLon = 0.18;
+    const bbox = [
+      lon - padLon, lat - padLat,
+      lon + padLon, lat + padLat
+    ].join(",");
+
+    const url = new URL(
+      "https://api.tomtom.com/traffic/services/5/incidentDetails"
+    );
+
+    url.search = new URLSearchParams({
+      key,
+      bbox,
+      fields: "{incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description,code},from,to,startTime,endTime,roadNumbers}}}",
+      language: "de-DE",
+      t: "-1",
+      timeValidityFilter: "present"
+    });
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn("Traffic incident API:", response.status);
+        continue;
+      }
+      const data = await response.json();
+      for (const item of (data.incidents || [])) {
+        const id = item.id || JSON.stringify(item.properties || {});
+        unique.set(id, item);
+      }
+    } ca
